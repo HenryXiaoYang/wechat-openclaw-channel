@@ -112,27 +112,15 @@ const tencentAccessPlugin = {
         tokenPrefix: token ? token.substring(0, 6) + "..." : "(未配置)",
       });
 
-      // Token 获取策略：配置 > 已保存的登录态 > 交互式扫码登录
+      // Token 获取策略：配置 > 已保存的登录态 > 提示用户手动登录
       if (!token) {
         const savedState = loadState(authStatePath);
         if (savedState?.channelToken) {
           token = savedState.channelToken;
           log?.info(`[wechat-access] 使用已保存的 token: ${token.substring(0, 6)}...`);
         } else {
-          log?.info(`[wechat-access] 未找到 token，启动微信扫码登录...`);
-          try {
-            const credentials = await performLogin({
-              guid,
-              env,
-              bypassInvite,
-              authStatePath,
-              log,
-            });
-            token = credentials.channelToken;
-          } catch (err) {
-            log?.error(`[wechat-access] 登录失败: ${err}`);
-            return;
-          }
+          log?.warn(`[wechat-access] 未找到 token，请在终端运行 "openclaw wechat-login" 完成扫码登录，然后重启 Gateway`);
+          return;
         }
       }
 
@@ -226,7 +214,58 @@ const index = {
     // 2. 注册渠道插件
     api.registerChannel({ plugin: tencentAccessPlugin as any });
 
-    // 3. 注册 /wechat-login 命令（手动触发扫码登录）
+    // 3. 注册 CLI 命令（终端交互式登录/登出）
+    api.registerCli(
+      ({ program, config }) => {
+        const wechat = program.command("wechat").description("微信通路登录管理");
+
+        wechat
+          .command("login")
+          .description("微信扫码登录，获取 channel token")
+          .action(async () => {
+            const channelCfg = config?.channels?.["wechat-access-unqclawed"];
+            const bypassInvite = channelCfg?.bypassInvite === true;
+            const authStatePath = channelCfg?.authStatePath
+              ? String(channelCfg.authStatePath)
+              : undefined;
+            const envName = channelCfg?.environment
+              ? String(channelCfg.environment)
+              : "production";
+
+            const env = getEnvironment(envName);
+            const guid = getDeviceGuid();
+
+            try {
+              const credentials = await performLogin({
+                guid,
+                env,
+                bypassInvite,
+                authStatePath,
+              });
+              console.log(`\n登录成功! token: ${credentials.channelToken.substring(0, 6)}...`);
+              console.log("token 已保存，请运行 openclaw gateway restart 生效。");
+            } catch (err) {
+              console.error(`\n登录失败: ${err instanceof Error ? err.message : String(err)}`);
+              process.exit(1);
+            }
+          });
+
+        wechat
+          .command("logout")
+          .description("清除已保存的微信登录态")
+          .action(() => {
+            const channelCfg = config?.channels?.["wechat-access-unqclawed"];
+            const authStatePath = channelCfg?.authStatePath
+              ? String(channelCfg.authStatePath)
+              : undefined;
+            clearState(authStatePath);
+            console.log("已清除登录态，下次启动将需要重新扫码登录。");
+          });
+      },
+      { commands: ["wechat"] },
+    );
+
+    // 4. 注册 /wechat-login 命令（聊天渠道内触发）
     api.registerCommand?.({
       name: "wechat-login",
       description: "手动执行微信扫码登录，获取 channel token",
@@ -257,7 +296,7 @@ const index = {
       },
     });
 
-    // 4. 注册 /wechat-logout 命令（清除已保存的登录态）
+    // 5. 注册 /wechat-logout 命令（聊天渠道内触发）
     api.registerCommand?.({
       name: "wechat-logout",
       description: "清除已保存的微信登录态",
