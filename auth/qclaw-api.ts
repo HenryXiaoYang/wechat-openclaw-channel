@@ -139,7 +139,7 @@ export class QClawAPI {
   async generateContactLink(openKfId: string): Promise<QClawApiResponse> {
     return this.post("data/4018/forward", {
       guid: this.guid,
-      user_id: this.userId,
+      user_id: Number(this.userId),
       open_id: openKfId,
       contact_type: "open_kfid",
     });
