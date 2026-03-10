@@ -199,6 +199,65 @@ const tencentAccessPlugin = {
           }
         } catch { /* non-fatal */ }
 
+        // 7. 生成企微客服链接，等待设备绑定
+        const OPEN_KFID = "wkzLlJLAAAfbxEV3ZcS-lHZxkaKmpejQ";
+        runtime.log("\n[wechat-access] 生成企微客服链接...");
+        const linkResult = await api.generateContactLink(OPEN_KFID);
+        let deviceBound = false;
+
+        if (!linkResult.success) {
+          runtime.log(`[wechat-access] 生成链接失败: ${linkResult.message ?? "未知错误"}（跳过设备绑定）`);
+        } else {
+          const linkData = linkResult.data as Record<string, unknown>;
+          const contactUrl =
+            (nested(linkData, "url") as string) ||
+            (nested(linkData, "data", "url") as string) ||
+            "";
+
+          if (!contactUrl) {
+            runtime.log("[wechat-access] 返回数据中没有 URL（跳过设备绑定）");
+          } else {
+            runtime.log("=".repeat(60));
+            runtime.log("  用微信扫描下方二维码，进入客服对话完成设备绑定");
+            runtime.log("=".repeat(60));
+
+            try {
+              const qrterm = await import("qrcode-terminal");
+              const generate = qrterm.default?.generate ?? qrterm.generate;
+              generate(contactUrl, { small: true }, (qrcode: string) => {
+                runtime.log("\n" + qrcode);
+              });
+            } catch {
+              runtime.log("(qrcode-terminal 不可用)");
+            }
+            runtime.log(`\n或手动打开: ${contactUrl}\n`);
+
+            // 轮询等待绑定
+            runtime.log("[wechat-access] 等待微信扫码绑定 (超时 5 分钟)...");
+            const bindDeadline = Date.now() + 300_000;
+            while (Date.now() < bindDeadline) {
+              await new Promise((r) => setTimeout(r, 2000));
+              try {
+                const status = await api.queryDeviceByGuid();
+                if (status.success) {
+                  const sd = status.data as Record<string, unknown>;
+                  const nick =
+                    (nested(sd, "nickname") as string) ||
+                    (nested(sd, "data", "nickname") as string);
+                  if (nick) {
+                    runtime.log(`[wechat-access] 设备绑定成功! 微信昵称: ${nick}`);
+                    deviceBound = true;
+                    break;
+                  }
+                }
+              } catch { /* continue polling */ }
+            }
+            if (!deviceBound) {
+              runtime.log("[wechat-access] 设备绑定超时，可稍后重新执行 channels login");
+            }
+          }
+        }
+
         // 写入 openclaw.json（统一存储）
         try {
           const wRuntime = getWecomRuntime();
@@ -216,7 +275,7 @@ const tencentAccessPlugin = {
             models.providers = providers;
             nextCfg.models = models;
           }
-          await runtime.config.writeConfigFile(nextCfg);
+          await wRuntime.config.writeConfigFile(nextCfg);
         } catch { /* non-fatal: fallback to state file */ }
 
         // 备份到独立文件（兜底）

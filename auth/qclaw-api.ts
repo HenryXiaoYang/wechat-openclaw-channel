@@ -126,4 +126,24 @@ export class QClawAPI {
     }
     return null;
   }
+
+  /** 生成企微客服专属链接 (cmd_id=4018) */
+  async generateContactLink(openKfId: string): Promise<QClawApiResponse> {
+    return this.post("data/4018/forward", {
+      guid: this.guid,
+      user_id: this.userId,
+      open_id: openKfId,
+      contact_type: "open_kfid",
+    });
+  }
+
+  /** 查询设备绑定状态 (cmd_id=4019) */
+  async queryDeviceByGuid(): Promise<QClawApiResponse> {
+    return this.post("data/4019/forward", { guid: this.guid });
+  }
+
+  /** 断开设备绑定 (cmd_id=4020) */
+  async disconnectDevice(): Promise<QClawApiResponse> {
+    return this.post("data/4020/forward", { guid: this.guid });
+  }
 }
