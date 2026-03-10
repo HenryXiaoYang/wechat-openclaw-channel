@@ -16,13 +16,19 @@ openclaw config set channels.wechat-access-unqclawed.enabled true
 
 ## 首次登录
 
-安装并启用后，在终端执行扫码登录：
-
 ```bash
-openclaw wechat login
+openclaw channels login --channel wechat-access-unqclawed
 ```
 
-终端会显示微信二维码，扫码授权后 token 自动保存。然后重启 Gateway：
+终端会显示微信二维码（或浏览器链接），用微信扫码并确认后，浏览器会跳转到新页面。
+
+在**另一个终端窗口**中，将浏览器地址栏的完整 URL 或 `code` 参数值写入临时文件：
+
+```bash
+echo "粘贴的URL或code" > ~/.openclaw/wechat-auth-code.tmp
+```
+
+原窗口会自动检测并完成登录，token 自动保存。然后重启 Gateway：
 
 ```bash
 openclaw gateway restart
@@ -35,22 +41,6 @@ openclaw gateway restart
 - AGP 协议 WebSocket 双向通信（流式文本、工具调用）
 - 邀请码验证（可配置跳过）
 - 支持生产/测试环境切换
-
-## 命令
-
-### CLI 命令（终端）
-
-| 命令 | 说明 |
-|------|------|
-| `openclaw wechat login` | 交互式微信扫码登录 |
-| `openclaw wechat logout` | 清除已保存的登录态 |
-
-### 聊天命令（渠道内）
-
-| 命令 | 说明 |
-|------|------|
-| `/wechat-login` | 触发扫码登录（QR 码输出到 Gateway 日志） |
-| `/wechat-logout` | 清除已保存的登录态 |
 
 ## 配置
 
@@ -83,7 +73,7 @@ openclaw gateway restart
 
 1. 读取配置中的 `token` — 如果有，直接使用
 2. 读取本地保存的登录态（`~/.openclaw/wechat-access-auth.json`）
-3. 以上都没有 — 运行 `openclaw wechat login` 手动登录
+3. 以上都没有 — 运行 `openclaw channels login --channel wechat-access-unqclawed` 手动登录
 
 ## 项目结构
 
@@ -95,7 +85,8 @@ auth/
   device-guid.ts         # 设备 GUID 生成（随机，持久化）
   qclaw-api.ts           # QClaw JPRX 网关 API 客户端
   state-store.ts         # Token 持久化
-  wechat-login.ts        # 扫码登录流程编排
+  wechat-login.ts        # 扫码登录流程编排（交互式）
+  wechat-qr-poll.ts      # QR 码生成与轮询
 websocket/
   types.ts               # AGP 协议类型
   websocket-client.ts    # WebSocket 客户端（连接、心跳、重连）
