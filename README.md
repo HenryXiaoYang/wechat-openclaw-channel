@@ -1,5 +1,11 @@
 # wechat-openclaw-channel
 
+<p align="center">
+    <a href="https://linux.do" alt="LINUX DO"><img src="https://shorturl.at/ggSqS" /></a>
+</p>
+
+---
+
 > **v1.1.0 — 现已支持 WorkBuddy 模式！** 无需内测码，通过 WorkBuddy 账号即可登录使用。
 
 OpenClaw 微信通路插件 — 支持 QClaw 和 WorkBuddy 双模式。
